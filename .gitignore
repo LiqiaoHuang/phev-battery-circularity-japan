@@ -1,0 +1,17 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+.ipynb_checkpoints/
+
+# Generated results and private licensed inputs
+results/
+private_inputs/
+private_test_inputs/
+*_factors.csv
+*factor_library*
+*.zolca
+*.spold
