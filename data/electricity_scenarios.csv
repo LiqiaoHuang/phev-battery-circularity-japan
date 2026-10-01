@@ -1,0 +1,8 @@
+country,model,scenario,source_region,source_resolution,source_file
+JPN,JMIP2_median (four models),46by30+100by50,Japan,national_JMIP2,JMIP2_R1_Net_Zero_CDR_database.csv
+CHN,TIMES-China 2.0,NDC,CHN,ISO3_country,AR6_Scenarios_Database_ISO3_v1.1.csv
+KOR,AIM/Hub-Korea 2.0,EN_NP_UNDC,KOR,ISO3_country,AR6_Scenarios_Database_ISO3_v1.1.csv
+AUS,POLES GECO2019,CO_NDCplus,AUS,ISO3_country,AR6_Scenarios_Database_ISO3_v1.1.csv
+NZL,IMAGE 3.0,EN_INDCi2100,R10PAC_OECD,R10_regional_proxy,AR6_Scenarios_Database_R10_regions_v1.1.csv
+KEN,TIAM-ECN KEN 1.1,NDC,KEN,ISO3_country,AR6_Scenarios_Database_ISO3_v1.1.csv
+MNG,IMAGE 3.0,EN_INDCi2100,R10CHINA+,R10_regional_proxy,AR6_Scenarios_Database_R10_regions_v1.1.csv

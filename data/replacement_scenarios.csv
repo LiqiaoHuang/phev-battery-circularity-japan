@@ -1,0 +1,8 @@
+alternative,description,new_nmc_fraction,new_lfp_fraction,no_replacement_fraction
+A0,Other manufacturer used PHEV replacement within the modelled boundary,0,0,0
+A1,Used EV import with the same incremental battery boundary as A0,0,0,0
+A2,New NMC811 battery for each suppressed export,1,0,0
+A3,Equivalent capacity of new LFP modules for each suppressed export,0,1,0
+A4,No replacement and reduced mobility service,0,0,1
+A5,Half used imports and half new NMC811 batteries,0.5,0,0
+A6,Half new NMC811 batteries and half equivalent LFP modules,0.5,0.5,0

@@ -1,0 +1,8 @@
+case,export_suppression_rate,capture_rate_domestic,bess_accept_cap
+base,0.5,0.5,0.5
+export_suppression_rate_0p3,0.3,0.5,0.5
+export_suppression_rate_0p7,0.7,0.5,0.5
+capture_rate_domestic_0p3,0.5,0.3,0.5
+capture_rate_domestic_0p7,0.5,0.7,0.5
+bess_accept_cap_0p3,0.5,0.5,0.3
+bess_accept_cap_0p7,0.5,0.5,0.7

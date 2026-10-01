@@ -1,0 +1,92 @@
+group,indicator
+Worker,"Children in employment, female"
+Worker,"Children in employment, male"
+Worker,"Children in employment, total"
+Worker,Evidence of violations of laws and employment regulations
+Worker,Freedom of association and collective bargaining
+Worker,Frequency of forced labour
+Worker,Gender wage gap
+Worker,"Living wage, per month"
+Worker,Men in the sectoral labour force
+Worker,"Minimum wage, per month"
+Worker,Paid maternity leave
+Worker,Rate of fatal accidents at workplace
+Worker,Rate of non-fatal accidents at workplace
+Worker,"Sector average wage, per month"
+Worker,Trade union density
+Worker,Trafficking in persons
+Worker,Weekly hours of work per employee female
+Worker,Weekly hours of work per employee male
+Worker,Women in the sectoral labour force
+Worker,number of strikes
+Local community,Certified environmental management systems
+Local community,Embodied CO2 footprint
+Local community,Embodied CO2-eq footprint
+Local community,Embodied agricultural area footprint
+Local community,Embodied forest area footprint
+Local community,Embodied water footprint
+Local community,Extraction of biomass (related to area)
+Local community,Extraction of biomass (related to population)
+Local community,Extraction of fossil fuels
+Local community,Extraction of industrial and construction minerals
+Local community,Extraction of ores
+Local community,Homicides
+Local community,Indigenous People Rights Protection Index
+Local community,Internally displaced people
+Local community,Level of industrial water use (related to renewable water resources)
+Local community,Level of industrial water use (related to total withdrawal)
+Local community,Presence of indigenous population
+Local community,Waste management
+Society,Access to electricity
+Society,Access to internet
+Society,Biodiversity & Habitat
+Society,"Child marriage, female"
+Society,"Child marriage, male"
+Society,Contribution to economic development
+Society,Ecosystem services
+Society,Embodied value added total
+Society,Female with account at a financial institution
+Society,Food insecurity
+Society,Freedom of the press
+Society,Gender inequalities
+Society,Global Peace Index
+Society,Global Terrorism Index
+Society,Global freedom scores
+Society,"Health expenditure, domestic general government"
+Society,"Health expenditure, external resources"
+Society,"Health expenditure, out-of-pocket"
+Society,"Health expenditure, total"
+Society,"Household air pollution attributable DALYs, female"
+Society,"Household air pollution attributable DALYs, male"
+Society,"Illiteracy rate, female"
+Society,"Illiteracy rate, male"
+Society,"Illiteracy rate, total"
+Society,"Informal employment, female"
+Society,"Informal employment, male"
+Society,"Informal employment, total"
+Society,International Migrant Stock
+Society,International migrant workers in the sector
+Society,Internet freedom scores
+Society,Labour productivity
+Society,Life expectancy at birth
+Society,"Mean years of schooling, female"
+Society,"Mean years of schooling, male"
+Society,"Mean years of schooling, total"
+Society,Net migration rate
+Society,Number of threatened species
+Society,Political stability and absence of violence
+Society,Pollution level of the country
+Society,Public expenditure on education
+Society,Public sector corruption
+Society,R&D expenditures
+Society,Rate of researchers
+Society,Safe access to Drinking water coverage
+Society,Sanitation coverage
+Society,Social Protection Expenditures
+Society,State of democracy
+Society,Under-five mortality rate
+Society,Unemployment rate in the country
+Society,"Youth illiteracy rate, female"
+Society,"Youth illiteracy rate, male"
+Society,"Youth illiteracy rate, total"
+Society,Youth unemployment
