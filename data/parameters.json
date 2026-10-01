@@ -1,0 +1,48 @@
+{
+  "system": {
+    "C_kWh": 18.1,
+    "DoD": 0.95,
+    "km_per_kWh": 10.3
+  },
+  "degradation": {
+    "U_beta_a": 2.0,
+    "U_beta_b": 2.0,
+    "lambda_knee": 1.5,
+    "sigma_knee": 0.1,
+    "T50_mean": 1079.0,
+    "beta_T": -0.5,
+    "sigma_T50": 0.1,
+    "phi_const": 6.818840579710145
+  },
+  "lfp": {
+    "module_kWh": 2.4,
+    "DoD": 0.968,
+    "eta": 0.95,
+    "dSoH_per_cycle": 4.397e-05,
+    "cycles_per_day": 1.0
+  },
+  "intervention": {
+    "recovery_start_year": 2035,
+    "bess_operation_start_year": 2035,
+    "export_suppression_rate": 0.5,
+    "capture_rate_domestic": 0.5,
+    "capture_rate_suppressed_export": 1.0,
+    "bess_accept_cap": 0.5,
+    "bess_cycles_per_day": 1.0,
+    "bess_eol_soh": 0.5,
+    "end_year": 2050,
+    "rng_seed": 42,
+    "REC_NISO4_KG": 24.8,
+    "REC_COSO4_KG": 3.07,
+    "REC_LI2CO3_KG": 7.4
+  },
+  "route_ratios": {
+    "Export_NewZealand": 0.1,
+    "Export_Mongolia": 0.04,
+    "Export_Australia": 0.03,
+    "Export_Kenya": 0.01,
+    "Domestic_BM_JP": 0.25,
+    "Domestic_Disposal_JP": 0.57
+  },
+  "seed_base": 910000
+}
