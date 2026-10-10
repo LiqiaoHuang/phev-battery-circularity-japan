@@ -148,7 +148,7 @@ def japan_model_factors(shares, technology_factors):
 
 
 def japan_annual_median(model_factors, years=np.arange(2022, 2051)):
-    """Take indicator medians at reported years, then interpolate as in SI Note 4.
+    """Take indicator medians at reported years, then interpolate as in SI Note 3.
 
     Input columns are model, year, indicator and factor_per_kwh. These are
     model-specific technology-weighted factors at original reported years,

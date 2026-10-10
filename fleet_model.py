@@ -8,12 +8,10 @@ Use run_model.py to load the study inputs and export annual flow tables.
 import math
 import datetime
 from dataclasses import dataclass
-from typing import List
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Tuple
-from typing import Dict
 
 # Shared parameters and degradation calculations
 
@@ -254,7 +252,7 @@ def _append_total_row(df: pd.DataFrame, year_col: str='year', label: str='TOTAL'
 
 # BAU fleet and end-of-life routes
 
-def run_bad_scenario_fullfleet(seed: int=20251218, sysP=None, mp=None):
+def run_bad_scenario_fullfleet(seed: int=20251218, sysP=None, mp=None, recovery_yields=None):
     """Calculate BAU vehicle service, exports, retirement and recovery by year."""
     if sysP is None:
         sysP = SystemParams()
@@ -269,9 +267,9 @@ def run_bad_scenario_fullfleet(seed: int=20251218, sysP=None, mp=None):
     J_EXPORT_LEFT, J_EXPORT_MODE, J_EXPORT_RIGHT = (3, 5, 7)
     S_OV_LEFT, S_OV_MODE, S_OV_RIGHT = (0.6, 0.65, 0.7)
     OV_LEFT, OV_MODE, OV_RIGHT = (8, 12, 15)
-    REC_NISO4_KG = 24.8
-    REC_COSO4_KG = 3.07
-    REC_LI2CO3_KG = 7.4
+    REC_NISO4_KG, REC_COSO4_KG, REC_LI2CO3_KG = recovery_yields or (24.8, 3.07, 7.4)
+    if not np.isfinite([REC_NISO4_KG, REC_COSO4_KG, REC_LI2CO3_KG]).all() or min(REC_NISO4_KG, REC_COSO4_KG, REC_LI2CO3_KG) < 0:
+        raise ValueError("Recovery yields must be finite and nonnegative.")
     countries = ['Japan', 'New Zealand', 'Australia', 'Mongolia', 'Kenya']
     c2i = {c: i for i, c in enumerate(countries)}
     nC = len(countries)
@@ -280,6 +278,7 @@ def run_bad_scenario_fullfleet(seed: int=20251218, sysP=None, mp=None):
     diff_in = np.zeros((nC, nY + 1), dtype=float)
     diff_km = np.zeros((nC, nY + 1), dtype=float)
     retired = np.zeros((nC, nY), dtype=np.int64)
+    exports_by_dest = {d: np.zeros(nY, dtype=np.int64) for d in EXPORT_DESTS}
     bm_jp = np.zeros(nY, dtype=np.int64)
     disp_jp = np.zeros(nY, dtype=np.int64)
     bm_au = np.zeros(nY, dtype=np.int64)
@@ -290,7 +289,7 @@ def run_bad_scenario_fullfleet(seed: int=20251218, sysP=None, mp=None):
     lfp_retired = np.zeros(nY, dtype=np.int64)
     lfp_disposed = np.zeros(nY, dtype=np.int64)
     rg_global = rng(seed)
-    sample_size = 1000
+    sample_size = min(1000, FULL_N)
     sample_ids_arr = rg_global.choice(FULL_N, size=sample_size, replace=False).astype(np.int64)
     sample_chunks = []
     pid_base = 0
@@ -366,11 +365,18 @@ def run_bad_scenario_fullfleet(seed: int=20251218, sysP=None, mp=None):
             start_jp = np.full(n_exp, y, dtype=np.int32)
             end_jp = process_stage_const_annual(diff_active[c2i['Japan']], diff_in[c2i['Japan']], diff_deliv[c2i['Japan']], diff_km[c2i['Japan']], start_jp, years_jp, per_in, per_out, per_km)
             export_year = end_jp
+            add_point(exports_by_dest[dest], export_year, 1)
             start_ov = export_year + 1
             end_ov = process_stage_const_annual(diff_active[c2i[dest]], diff_in[c2i[dest]], diff_deliv[c2i[dest]], diff_km[c2i[dest]], start_ov.astype(np.int32), years_ov, per_in, per_out, per_km)
             add_point(retired[c2i[dest]], end_ov, 1)
             if dest in ['New Zealand', 'Australia']:
                 add_point(bm_au, end_ov, 1)
+            per_in_sample = (EinJ + EinF) / (years_jp + years_ov)
+            per_out_sample = (EoutJ + EoutF) / (years_jp + years_ov)
+            EinJ = per_in_sample * years_jp
+            EoutJ = per_out_sample * years_jp
+            EinF = per_in_sample * years_ov
+            EoutF = per_out_sample * years_ov
             pids0 = pid_base
             pids1 = pid_base + n_exp
             pids = np.arange(pids0, pids1, dtype=np.int64)
@@ -409,6 +415,8 @@ def run_bad_scenario_fullfleet(seed: int=20251218, sysP=None, mp=None):
         df_annual[f'delivered_kWh_{c}'] = deliv[i]
         df_annual[f'required_input_kWh_{c}'] = ein[i]
         df_annual[f'retired_packs_{c}'] = retired[i].astype(int)
+        if c != 'Japan':
+            df_annual['exports_'+c.replace(' ', '_')+'_packs'] = exports_by_dest[c]
         df_annual[f'active_packs_{c}_altsupply'] = 0
         df_annual[f'distance_km_{c}_altsupply'] = 0.0
         df_annual[f'delivered_kWh_{c}_altsupply'] = 0.0
@@ -443,7 +451,7 @@ def run_bad_scenario_fullfleet(seed: int=20251218, sysP=None, mp=None):
         df_annual[f'Li2CO3_kg_virgin_makeup_{_c}'] = 0.0
     df_lfp = pd.DataFrame({'year': YEARS, 'lfp_additions_modules': lfp_additions.astype(int), 'lfp_active_modules': lfp_active.astype(int), 'lfp_delivered_kWh': lfp_eout, 'lfp_required_input_kWh': lfp_ein, 'lfp_retired_modules': lfp_retired.astype(int), 'lfp_disposed_modules': lfp_disposed.astype(int)})
     df_sample1000 = pd.concat(sample_chunks, ignore_index=True).sort_values('pack_id') if sample_chunks else pd.DataFrame()
-    readme = pd.DataFrame({'note': ['Bad scenario output. (README simplified in split version)']})
+    readme = pd.DataFrame({'note': ['BAU annual flows and lifetime pack samples.']})
     meta = {'FULL_FLEET_total_packs': FULL_N, 'generated_at': jst_now_str(), 'seed': seed}
     return (df_annual, df_lfp, df_sample1000, readme, meta)
 
@@ -461,13 +469,14 @@ class InterventionParams:
     bess_cycles_per_day: float = 1.0
     bess_eol_soh: float = 0.5
     end_year: int = YN
-    rng_seed: int = 42
     REC_NISO4_KG: float = 24.8
     REC_COSO4_KG: float = 3.07
     REC_LI2CO3_KG: float = 7.4
 
 def simulate_bess_daily_from_candidates(sysP: SystemParams, mp: ModelParams, ip: InterventionParams, candidates_by_year: Dict[int, np.ndarray], seed: int=0) -> Tuple[pd.DataFrame, Dict[int, int], Dict[int, int], Optional[int]]:
     """Prioritise remaining cycle life and accumulate daily stationary-storage service."""
+    if ip.bess_cycles_per_day != 1.0:
+        raise ValueError("The daily BESS model supports one cycle per day.")
 
     def yidx_local(y: int) -> int:
         return int(y) - int(Y0)
@@ -560,7 +569,7 @@ def simulate_bess_daily_from_candidates(sysP: SystemParams, mp: ModelParams, ip:
             if not np.any(ongoing):
                 break
             year_seg += 1
-            if year_seg > int(YN):
+            if year_seg > int(ip.end_year):
                 break
             idx = np.where(ongoing)[0]
             days_y = days_in_year(year_seg)
@@ -619,6 +628,7 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
     diff_in = np.zeros((nC, nY + 1), dtype=float)
     diff_km = np.zeros((nC, nY + 1), dtype=float)
     retired = np.zeros((nC, nY), dtype=np.int64)
+    exports_by_dest = {d: np.zeros(nY, dtype=np.int64) for d in EXPORT_DESTS}
     diff_active_alt = np.zeros((nC, nY + 1), dtype=np.int64)
     diff_deliv_alt = np.zeros((nC, nY + 1), dtype=float)
     diff_in_alt = np.zeros((nC, nY + 1), dtype=float)
@@ -635,7 +645,7 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
     alt_supply_by_dest = {d: np.zeros(nY, dtype=np.int64) for d in export_dests}
     candidates_by_year: Dict[int, List[np.ndarray]] = {y: [] for y in range(ip.recovery_start_year, ip.end_year + 1)}
     rg_global = rng(seed)
-    sample_size = 1000
+    sample_size = min(1000, FULL_N)
     sample_ids_arr = rg_global.choice(FULL_N, size=sample_size, replace=False).astype(np.int64)
     sample_chunks = []
     pid_base = 0
@@ -746,6 +756,8 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
                 rg_sup = rng(yseed + 6000 + DEST_SEED[dest])
                 sup_flag[sup_eligible] = rg_sup.random(np.count_nonzero(sup_eligible)) < float(ip.export_suppression_rate)
             keep = ~sup_flag
+            add_point(exports_by_dest[dest], export_year[keep], 1)
+            captured_export = np.zeros(n_exp, dtype=bool)
             end_keep = np.full(n_exp, -1, dtype=np.int32)
             if np.any(keep):
                 tot_years = (years_jp[keep] + years_ov[keep]).astype(np.float64)
@@ -762,6 +774,7 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
                     add_point(bm_au, end_keep[keep], 1)
             if np.any(sup_flag):
                 add_point(suppressed_exports_by_dest[dest], export_year[sup_flag], 1)
+                add_point(alt_supply_by_dest[dest], start_ov[sup_flag], 1)
                 n_sup = int(sup_flag.sum())
                 tot_years_base = years_jp[sup_flag] + years_ov[sup_flag]
                 tot_Ein_base = EinJ[sup_flag] + EinF[sup_flag]
@@ -780,6 +793,7 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
                 else:
                     rg_cap = rng(yseed + 9000 + DEST_SEED[dest])
                     cap2 = rg_cap.random(n_sup) < float(ip.capture_rate_suppressed_export)
+                captured_export[sup_flag] = cap2
                 if np.any(cap2):
                     ev_year = export_year[sup_flag][cap2].astype(int)
                     add_point(recovered_network_inflow, ev_year, 1)
@@ -787,6 +801,12 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
                     SoH_entry = soh_piecewise(t90[sup_flag][cap2], T_knee[sup_flag][cap2], S_knee[sup_flag][cap2], dS1[sup_flag][cap2], dS2[sup_flag][cap2])
                     delta_kWh = sysP.C_kWh * SoH_entry
                     push_candidates(event_year=ev_year, delta_kWh=delta_kWh.astype(float), T_knee=T_knee[sup_flag][cap2], S_knee=S_knee[sup_flag][cap2], dS1=dS1[sup_flag][cap2], dS2=dS2[sup_flag][cap2], a=a[sup_flag][cap2], t_entry=t90[sup_flag][cap2].astype(int), SoH_entry=SoH_entry.astype(float))
+            per_in_sample = (EinJ + EinF) / (years_jp + years_ov)
+            per_out_sample = (EoutJ + EoutF) / (years_jp + years_ov)
+            EinJ = per_in_sample * years_jp
+            EoutJ = per_out_sample * years_jp
+            EinF = per_in_sample * years_ov
+            EoutF = per_out_sample * years_ov
             pids0 = pid_base
             pids1 = pid_base + n_exp
             pids = np.arange(pids0, pids1, dtype=np.int64)
@@ -816,7 +836,7 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
                 total_Ein_service = EinJ + EinJ2_all + EinF_phys + EinF_alt
                 total_Eout_service = EoutJ + EoutJ2_all + EoutF_phys + EoutF_alt
                 total_km_service = total_Eout_service * sysP.km_per_kWh
-                df = pd.DataFrame({'pack_id': pids[idx].astype(int), 'manufacture_year': y, 'route': f"Export_{dest.replace(' ', '_')}", 'jp_years': years_jp[idx].astype(int), 'ov_years': years_ov[idx].astype(int), 'export_year': export_year[idx].astype(int), 'retire_year': retire_year_phys[idx].astype(int), 'captured_network': 0, 'suppressed_export': sup_flag[idx].astype(int), 'Japan_Ein_kWh': EinJ[idx], 'Japan_Eout_kWh': EoutJ[idx], 'Japan_km': EoutJ[idx] * sysP.km_per_kWh, 'Japan_Ein_kWh_additional': EinJ2_all[idx], 'Japan_Eout_kWh_additional': EoutJ2_all[idx], 'Japan_km_additional': kmJ2_all[idx], 'Overseas_Ein_kWh_physical': EinF_phys[idx], 'Overseas_Eout_kWh_physical': EoutF_phys[idx], 'Overseas_km_physical': kmF_phys[idx], 'Overseas_Ein_kWh_altsupply': EinF_alt[idx], 'Overseas_Eout_kWh_altsupply': EoutF_alt[idx], 'Overseas_km_altsupply': kmF_alt[idx], 'Total_Ein_kWh_service': total_Ein_service[idx], 'Total_Eout_kWh_service': total_Eout_service[idx], 'Total_km_service': total_km_service[idx]})
+                df = pd.DataFrame({'pack_id': pids[idx].astype(int), 'manufacture_year': y, 'route': f"Export_{dest.replace(' ', '_')}", 'jp_years': years_jp[idx].astype(int), 'ov_years': years_ov[idx].astype(int), 'export_year': export_year[idx].astype(int), 'retire_year': retire_year_phys[idx].astype(int), 'captured_network': captured_export[idx].astype(int), 'suppressed_export': sup_flag[idx].astype(int), 'Japan_Ein_kWh': EinJ[idx], 'Japan_Eout_kWh': EoutJ[idx], 'Japan_km': EoutJ[idx] * sysP.km_per_kWh, 'Japan_Ein_kWh_additional': EinJ2_all[idx], 'Japan_Eout_kWh_additional': EoutJ2_all[idx], 'Japan_km_additional': kmJ2_all[idx], 'Overseas_Ein_kWh_physical': EinF_phys[idx], 'Overseas_Eout_kWh_physical': EoutF_phys[idx], 'Overseas_km_physical': kmF_phys[idx], 'Overseas_Ein_kWh_altsupply': EinF_alt[idx], 'Overseas_Eout_kWh_altsupply': EoutF_alt[idx], 'Overseas_km_altsupply': kmF_alt[idx], 'Total_Ein_kWh_service': total_Ein_service[idx], 'Total_Eout_kWh_service': total_Eout_service[idx], 'Total_km_service': total_km_service[idx]})
                 sample_chunks.append(df)
             pid_base += n_exp
         simulate_export_group(int(alloc_exp['New Zealand']), 'New Zealand')
@@ -875,6 +895,8 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
         df_annual[f'delivered_kWh_{c}'] = deliv[i]
         df_annual[f'required_input_kWh_{c}'] = ein[i]
         df_annual[f'retired_packs_{c}'] = retired[i].astype(int)
+        if c != 'Japan':
+            df_annual['exports_'+c.replace(' ', '_')+'_packs'] = exports_by_dest[c]
         df_annual[f'active_packs_{c}_altsupply'] = active_alt[i].astype(int)
         df_annual[f'distance_km_{c}_altsupply'] = km_alt[i]
         df_annual[f'delivered_kWh_{c}_altsupply'] = deliv_alt[i]
@@ -921,18 +943,20 @@ def run_bess_scenario_fullfleet(seed: int=20251218, ip: Optional[InterventionPar
         df_annual[f"altsupply_{dest.replace(' ', '_')}_packs"] = alt_supply_by_dest[dest].astype(int)
     df_bess_annual_full = pd.DataFrame({'year': YEARS}).merge(df_bess_annual, on='year', how='left').fillna(0)
     df_sample1000 = pd.concat(sample_chunks, ignore_index=True).sort_values('pack_id') if sample_chunks else pd.DataFrame()
-    readme = pd.DataFrame({'note': ['BESS scenario output. (README simplified in split version)']})
+    readme = pd.DataFrame({'note': ['Circular annual flows and lifetime pack samples.']})
     meta = {'FULL_FLEET_total_packs': FULL_N, 'generated_at': jst_now_str(), 'seed': seed, 'ip': ip.__dict__, 'bess_start_actual': str(bess_start_actual) if bess_start_actual is not None else None}
     return (df_annual, df_bess_annual_full, df_sample1000, readme, meta)
 
 
 # Service-equivalent LFP storage and material make-up
 
-def build_bad_lfp_from_bess_service(df_bess_annual: pd.DataFrame, lp: LFPParams):
+def build_bad_lfp_from_bess_service(df_bess_annual: pd.DataFrame, lp: LFPParams, start_year=2035, end_year=2050):
     """Size the new LFP comparator for the cumulative service delivered by second-life packs."""
-    install_year = 2035
-    start_year = 2035
-    end_year = 2050
+    install_year = start_year
+    if lp.cycles_per_day != 1.0:
+        raise ValueError("The LFP comparator supports one cycle per day.")
+    if not Y0 <= start_year <= end_year <= YN:
+        raise ValueError("Storage years must be ordered within the study horizon.")
     mask = (df_bess_annual['year'].astype(int) >= start_year) & (df_bess_annual['year'].astype(int) <= end_year)
     if 'LiB_delivered_kWh' in df_bess_annual.columns:
         target_total = float(pd.to_numeric(df_bess_annual.loc[mask, 'LiB_delivered_kWh'], errors='coerce').fillna(0.0).sum())
@@ -945,7 +969,7 @@ def build_bad_lfp_from_bess_service(df_bess_annual: pd.DataFrame, lp: LFPParams)
     lfp_ret = np.zeros(nY, dtype=np.int64)
     lfp_disp = np.zeros(nY, dtype=np.int64)
     if target_total <= 0.0:
-        df_lfp = pd.DataFrame({'year': YEARS, 'lfp_additions_modules': lfp_add.astype(int), 'lfp_active_modules': lfp_act.astype(int), 'lfp_delivered_kWh': lfp_eout, 'lfp_required_input_kWh': lfp_ein, 'lfp_retired_modules': lfp_ret.astype(int), 'lfp_disposed_modules': lfp_disp.astype(int), 'lfp_effective_cycles_per_day': lfp_cpd})
+        df_lfp = pd.DataFrame({'year': YEARS, 'lfp_additions_modules': lfp_add.astype(int), 'lfp_active_modules': lfp_act.astype(int), 'lfp_delivered_kWh': lfp_eout, 'lfp_required_input_kWh': lfp_ein, 'lfp_retired_modules': lfp_ret.astype(int), 'lfp_disposed_modules': lfp_disp.astype(int)})
         return _append_total_row(df_lfp, 'year', 'TOTAL')
     years_span = end_year - start_year + 1
     days_per_year = 365

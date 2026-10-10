@@ -21,6 +21,9 @@ def load_flows(directory):
         if expected is not None and keys != expected:
             raise ValueError('The annual tables must contain the same case-year keys.')
         expected = keys
+    metadata = Path(directory)/'run_metadata.json'
+    if metadata.exists():
+        tables['_parameters'] = json.loads(metadata.read_text())['parameters']
     return tables
 
 
@@ -79,18 +82,21 @@ def build_activities(tables, mapping=None, alternative='A0'):
 
 
 def replacement_activities(activities, tables, alternative):
-    """Apply the A0-A6 battery-only counterfactuals defined in Table S8.
+    """Apply the six A0-A5 counterfactuals defined in Table S8.
 
-    A0 and A1 have the same incremental manufacturing boundary. LFP capacity
-    and retirement are proxies. A4 removes service and is not service equivalent.
+    A0 uses existing vehicles without additional battery production. A1 and A2
+    add NMC811 and LFP battery proxies, respectively. A3 and A4 are mixed cases.
+    LFP capacity and retirement are proxies. A5 leaves mobility service unmet.
     Whole-vehicle production and import transport are outside these adjustments.
     Removed Korean recovery is weighted by replacement-vehicle retirement timing.
     """
     definitions = pd.read_csv(ROOT/'data/replacement_scenarios.csv').set_index('alternative')
     if alternative not in definitions.index:
-        raise ValueError('Select A0 to A6 for the replacement assumption.')
+        raise ValueError('Select A0 to A5 for the replacement assumption.')
     rule = definitions.loc[alternative]
-    config = json.loads((ROOT/'data/parameters.json').read_text())
+    config = tables.get('_parameters')
+    if config is None:
+        config = json.loads((ROOT/'data/parameters.json').read_text())
     ratio = config['system']['C_kWh']/config['lfp']['module_kWh']
     circular = tables['Circular_vehicle_flows'].set_index(['case','year'])
     countries = ['New Zealand','Mongolia','Australia','Kenya']
@@ -143,7 +149,7 @@ def export_activities(directory, output=None, alternative='A0'):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--flows', type=Path, default=ROOT/'results')
-    parser.add_argument('--alternative', choices=['A'+str(i) for i in range(7)],default='A0')
+    parser.add_argument('--alternative', choices=['A'+str(i) for i in range(6)],default='A0')
     parser.add_argument('--output',type=Path)
     args = parser.parse_args()
     if args.alternative != 'A0' and (args.output is None or args.output.resolve()==args.flows.resolve()):

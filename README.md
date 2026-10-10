@@ -8,7 +8,7 @@ The fleet model runs using the files in this repository. Impact calculations req
 
 ## Quick start
 
-Use Python 3.10 or later. Run these commands from the repository folder.
+Use Python 3.10 or later. The calculation was checked using Python 3.12, NumPy 2.3.5 and pandas 2.2.3; `requirements-tested.txt` pins those library versions. Run these commands from the repository folder.
 
 ```bash
 python -m pip install -r requirements.txt
@@ -21,7 +21,7 @@ To run the base case and six distinct intervention settings, use
 python run_model.py --case all
 ```
 
-No commercial database is needed for this step. The calculation produces five annual physical-flow tables and two impact-activity tables in `results/`, which is created when the model runs. BAU stationary storage uses new LFP modules sized to provide the same cumulative delivered storage service as the second-life system in the Circular scenario.
+No commercial database is needed for this step. The calculation produces five annual physical-flow tables, two impact-activity tables, an original-fleet material partition and run metadata in `results/`, which is created when the model runs. BAU stationary storage uses new LFP modules sized to provide the same cumulative delivered storage service as the second-life system in the Circular scenario.
 
 ## Code and inputs
 
@@ -29,20 +29,23 @@ No commercial database is needed for this step. The calculation produces five an
 | --- | --- |
 | `run_model.py` | Input loading and model execution |
 | `fleet_model.py` | Battery degradation, vehicle routing, stationary service and material recovery |
-| `activities.py` | Physical-to-impact activity conversion and A0–A6 replacement assumptions |
+| `activities.py` | Physical-to-impact activity conversion and A0 to A5 replacement assumptions |
+| `material_balance.py` | Original-fleet material partition for Figure 2g |
+| `validate_model.py` | Annual balances and optional published-base checks |
 | `electricity.py` | AR6 and Japanese JMIP2 electricity pathway processing |
 | `impact_calculation.py` | Impact aggregation, scenario comparison and electricity adjustments |
 | `data/parameters.json` | Battery, degradation, routing and intervention assumptions |
 | `data/manufacturing_schedule.csv` | Annual manufacturing trajectory from Supplementary Table S1 |
 | `data/scenarios.csv` | Base case and intervention settings |
-| `data/replacement_scenarios.csv` | A0–A6 replacement assumptions from Supplementary Table S8 |
+| `data/replacement_scenarios.csv` | A0 to A5 replacement assumptions from Supplementary Table S8 |
 | `data/electricity_scenarios.csv` | Selected electricity models, scenarios and source regions from Supplementary Table S2 |
 | `data/activity_mapping.csv` | Source columns, countries, reference units, conversion multipliers, credit signs and electricity weights |
+| `data/environmental_indicators.csv` | The 18 midpoint indicators required for environmental calculations |
 | `data/social_indicators.csv` | The 91 indicators retained for the main social analysis |
 
-Future manufacturing values are model assumptions, not observed sales. Rates, depth of discharge and state of health are fractions. Capacity is in kWh, `T50_mean` is in cycles and `dSoH_per_cycle` is capacity fade per cycle. Recovered products are expressed in kg per pack, not elemental metal masses. Service-life distributions are specified in `fleet_model.py` and Supplementary Note 2.
+Future manufacturing values are model assumptions, not observed sales. Rates, depth of discharge and state of health are fractions. Capacity is in kWh, `T50_mean` is in cycles and `dSoH_per_cycle` is capacity fade per cycle. Recovered products are expressed in kg per pack, not elemental metal masses. Service-life distributions are specified in `fleet_model.py` and Supplementary Note 1.
 
-Output column names identify packs, modules, kg, kWh, km and pack-days. Stock and average columns must not be summed as flows. Repeated 0.5 settings in the intervention sweeps are represented by the single base case.
+Output column names identify packs, modules, kg, kWh, km and pack-days. `altsupply_*_packs` records replacement vehicles entering overseas service, one year after the corresponding suppressed-export event. Only entries within 2022–2050 are counted. Sample tables returned by `fleet_model.py` describe lifetime service, including years beyond 2050; they use the same uniform annual allocation as fleet tables. Stock and average columns must not be summed as flows. Repeated 0.5 settings in the intervention sweeps are represented by the single base case.
 
 ## Activity units and system boundaries
 
@@ -54,13 +57,15 @@ Environmental hydrometallurgical product systems include upstream black mass pre
 
 ## Impact calculations
 
-Supply an authorised factor CSV with these columns.
+Supply an authorised factor CSV with these columns. Every nonzero activity needs all 18 environmental indicators or all 91 retained social indicators; missing factors raise an error.
 
 ```text
 factor_key,activity_unit,indicator,factor
 ```
 
 For environmental factors, `factor_key` is the component identifier in `activity_mapping.csv`. For social factors, it is `social_factor_key`. Units must match `environmental_unit` or `social_unit` exactly.
+
+For country-resolved social results, add `upstream_country` and supply the contribution factor for each supply-chain country. Each factor-country-indicator combination must be unique. The command then exports `upstream_countries.csv`; foreground country labels alone cannot reproduce supply-chain country results. Credit contribution factors must follow the same absolute-magnitude convention as total credit factors.
 
 Social factors are characterised medium risk hours (mrh) per reference activity and must not be multiplied by monetary reference amounts again. Environmental factors must match the study's foreground boundaries and chosen LCIA method. The main prospective environmental calculation uses 18 ReCiPe midpoint indicators.
 
@@ -95,11 +100,24 @@ Foreign technology factors have columns `country`, `technology`, `indicator` and
 python impact_calculation.py --assessment environment --factors PATH_TO_ENVIRONMENT_FACTORS.csv --grid-shares results/annual_electricity_shares.csv --technology-factors PATH_TO_FOREIGN_TECHNOLOGY_FACTORS.csv --japan-model-factors results/japan_model_factors.csv
 ```
 
-Japan uses annual absolute factors. Overseas explicit electricity uses the 2022 purchased-electricity factor multiplied by an indicator-specific generation index. Chinese and Korean embedded-electricity adjustments use recovery-weighted indices and assumed fractions of 0.40 for hydrometallurgy and 0.55 for materials. These are approximate scenario adjustments, not complete future inventories. Supplementary Note 4 describes the pathways and geographical proxies.
+Japan uses annual absolute factors. Overseas explicit electricity uses the 2022 purchased-electricity factor multiplied by an indicator-specific generation index. Chinese and Korean embedded-electricity adjustments use recovery-weighted indices and assumed fractions of 0.40 for hydrometallurgy and 0.55 for materials. These are approximate scenario adjustments, not complete future inventories. Supplementary Note 3 describes the pathways and geographical proxies.
 
 ## Scenario and sensitivity analysis
 
 The study compares predefined scenarios and sensitivities rather than applying formal multiobjective optimisation.
+
+Six mobility replacement cases are defined in Supplementary Table S8, with results in Table S11 and Figure S11.
+
+| Case | Replacement assumption |
+| --- | --- |
+| A0 | Equivalent existing used vehicles without additional battery production |
+| A1 | New NMC811 battery proxy for each suppressed export |
+| A2 | Equivalent capacity of new LFP modules for each suppressed export |
+| A3 | 50% existing used vehicles and 50% new NMC811 battery proxies |
+| A4 | 50% new NMC811 battery proxies and 50% equivalent LFP modules |
+| A5 | No replacement, leaving displaced mobility service unmet |
+
+A0 combines existing used vehicle sources that have the same inventory consequences within the modelled boundary. A0 to A4 preserve the imposed mobility service. A5 is a separate diagnostic case. The mixtures are illustrative assumptions rather than forecasts of market shares.
 
 The default activity tables use A0. To generate another replacement case without rerunning the fleet model, use a separate output directory.
 
@@ -107,9 +125,19 @@ The default activity tables use A0. To generate another replacement case without
 python activities.py --flows results --alternative A3 --output results/A3
 ```
 
-Then add `--flows results/A3` to the impact command. A0 and A1 share the same incremental battery boundary. The remaining cases adjust new NMC or LFP production, LFP disposal proxies, NMC recovery credits and replacement electricity. Korean recovery removals use replacement-vehicle retirement timing. A4 reduces mobility service and is not service equivalent. Whole-vehicle production and import transport are excluded from these adjustments.
+Then add `--flows results/A3` to the impact command. Additional production covers batteries only. Whole vehicle production and import transport are excluded. The LFP case uses equivalent capacity and a disposal proxy. Korean recovery removals use replacement vehicle retirement timing.
 
-The `--case all` option varies export suppression, domestic capture and storage acceptance one at a time. The parameter files and Supplementary Notes 1 and 2 describe the assumptions. Embedded-electricity fractions are exposed in `activity_mapping.csv`.
+The `--case all` option varies export suppression, domestic capture and storage acceptance one at a time. These intervention settings change physical flows, while A0 to A5 are applied to the resulting impact activities using `--alternative`. The parameter files and Supplementary Notes 1 and 2 describe the assumptions. Embedded-electricity fractions are exposed in `activity_mapping.csv`.
+
+## Reproduction checks and scope
+
+`python validate_model.py --flows results` checks service equivalence, replacement entries and storage balances. Add `--published-base` to check the unchanged published base-case physical quantities. `material_balance.csv` excludes replacement batteries and counts original export events through 2050; its seven bins sum to all manufactured packs. `run_metadata.json` records input and code hashes, parameters and runtime versions. Replacement activities use the saved run parameters when metadata is present.
+
+Both storage technologies use one cycle per day. Other cycling rates are rejected. `seed_base` controls cohort sampling; the default function seed 20251218 controls sample selection and stationary acceptance tie-breaking. The unused `rng_seed` field has been removed. Recovery yields apply to both fleet scenarios. The LFP comparator uses the configured stationary start and end years, 365 cycles per full year, and disposal at the end year. BESS uses calendar days, including leap years.
+
+Vehicle electricity is distributed uniformly over combined Japanese and overseas service years, rather than independently over the two cycle-derived stages. Battery degradation determines total lifetime energy and capture SoH. Mobility is battery-electric-equivalent distance; petrol use is excluded. Stationary service is matched cumulatively, and annual output profiles differ.
+
+This package does not run the fleet-bootstrap analysis, indicator-screening variants, the storage-efficiency sweep, or the PSILCA trade-adjustment construction. Those analyses require additional source inputs and workflows. Static social totals use externally supplied final characterised factors. Do not interpret a successful fleet run as reproduction of every manuscript figure or uncertainty result.
 
 ## Availability and licence
 

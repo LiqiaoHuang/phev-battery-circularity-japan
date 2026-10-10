@@ -27,16 +27,19 @@ def calculate_impacts(activities, factors, assessment='environment'):
     keys = ['factor_key', 'activity_unit', 'indicator']
     if not set(keys+['factor']) <= set(factors) or factors.empty:
         raise ValueError('Supply factor_key, activity_unit, indicator and factor.')
-    if factors[keys].isna().any().any() or factors.duplicated(keys).any():
+    country_factors = assessment == 'social' and 'upstream_country' in factors
+    factor_keys = keys + (['upstream_country'] if country_factors else [])
+    if factors[factor_keys].isna().any().any() or factors.duplicated(factor_keys).any():
         raise ValueError('Factor keys must be present and unique.')
     if not np.isfinite(factors.factor).all() or not np.isfinite(activities.quantity).all():
         raise ValueError('Activities and factors must be finite numeric values.')
     if assessment == 'social':
         indicators = pd.read_csv(ROOT/'data/social_indicators.csv')[['indicator']]
     else:
-        indicators = factors[['indicator']].drop_duplicates()
+        indicators = pd.read_csv(ROOT/'data/environmental_indicators.csv')[['indicator']]
     rows = activities.merge(indicators, how='cross').merge(
-        factors[keys+['factor']], on=keys, how='left', validate='many_to_one')
+        factors[factor_keys+['factor']], on=keys, how='left',
+        validate='many_to_many' if country_factors else 'many_to_one')
     missing = rows.factor.isna() & rows.quantity.ne(0)
     if missing.any():
         sample = rows.loc[missing, keys].drop_duplicates().head(5).to_dict('records')
@@ -95,7 +98,7 @@ def electricity_indices(shares, technology_factors):
 
 
 def apply_environment_grid(rows, foreign_indices, japan_factors):
-    """Apply Supplementary Note 4 without changing social factors.
+    """Apply Supplementary Note 3 without changing social factors.
 
     Foreign explicit electricity uses purchased-electricity baseline factors
     times the generation-mix index. Japan uses absolute annual median factors.
@@ -164,6 +167,8 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     totals = rows.groupby(['case', 'scenario', 'indicator'], as_index=False).impact.sum()
     rows.groupby(['case', 'scenario', 'component', 'indicator'], as_index=False).impact.sum().to_csv(output/'components.csv', index=False)
+    if 'upstream_country' in rows:
+        rows.groupby(['case', 'scenario', 'upstream_country', 'indicator'], as_index=False).impact.sum().to_csv(output/'upstream_countries.csv', index=False)
     scenario_changes(totals).to_csv(output/'scenario_comparison.csv', index=False)
     if args.assessment == 'social':
         summed = totals.groupby(['case', 'scenario'], as_index=False).impact.sum()
