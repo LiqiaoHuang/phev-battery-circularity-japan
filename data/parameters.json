@@ -31,7 +31,6 @@
     "bess_cycles_per_day": 1.0,
     "bess_eol_soh": 0.5,
     "end_year": 2050,
-    "rng_seed": 42,
     "REC_NISO4_KG": 24.8,
     "REC_COSO4_KG": 3.07,
     "REC_LI2CO3_KG": 7.4
